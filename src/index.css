@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .animate-spin-slow {
+    animation: spin 14s linear infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bae6fd;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0284c7;
+}
+
+/* Real-Time Weather Animations */
+
+/* 1. Falling Raindrops Animation */
+.raindrop {
+  position: absolute;
+  background: linear-gradient(to bottom, rgba(56, 189, 248, 0), rgba(56, 189, 248, 0.7));
+  width: 2px;
+  height: 24px;
+  border-radius: 9999px;
+  animation: fallRain 1.2s linear infinite;
+}
+
+@keyframes fallRain {
+  0% {
+    transform: translateY(-50px) rotate(10deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(105vh) rotate(10deg);
+    opacity: 0.2;
+  }
+}
+
+/* 2. Floating Clouds Animation */
+.cloud-shape {
+  position: absolute;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, rgba(224, 242, 254, 0.25) 70%, transparent 100%);
+  border-radius: 50%;
+  filter: blur(20px);
+  animation: floatCloud 25s linear infinite;
+}
+
+@keyframes floatCloud {
+  0% {
+    transform: translateX(-250px);
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(105vw);
+    opacity: 0.2;
+  }
+}
+
+/* 3. Sunshine Beams Animation */
+.sunbeam {
+  position: absolute;
+  top: -150px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.25) 0%, rgba(56, 189, 248, 0.1) 45%, transparent 75%);
+  filter: blur(40px);
+  animation: sunPulse 6s ease-in-out infinite alternate;
+}
+
+@keyframes sunPulse {
+  0% {
+    transform: translateX(-50%) scale(0.95);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(-50%) scale(1.1);
+    opacity: 0.95;
+  }
+}
