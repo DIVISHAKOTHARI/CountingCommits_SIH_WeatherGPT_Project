@@ -34,10 +34,10 @@ export async function generateWeatherAIResponse(query, locationInfo, weatherData
     textEn = `🛰️ **Satellite Analysis for ${locName}, ${state}**:\n` +
       `Live INSAT-3DR thermal infrared imagery indicates active convective cloud bands hovering over coastal & central ${state}. ` +
       `Current surface temperature is **${weatherData.temperature}°C** with relative humidity at **${weatherData.humidity}%**. ` +
-      `Rainfall probability over the next 24-48 hours is estimated at **${weatherData.rainProb}%** with expected localized precipitation of **${(weatherData.precipitation + 4.2).toFixed(1)} mm**.\n\n` +
+      `Rainfall probability over the next 24-48 hours is estimated at **${weatherData.rainProb}%** with expected localized precipitation of **${weatherData.precipitation.toFixed(1)} mm**.\n\n` +
       `🌾 **Agricultural Impact & Advisory**:\n` +
-      `• Ground moisture levels are optimal for standing crops (Cotton, Groundnut, Wheat).\n` +
-      `• Farmers in North/Saurashtra regions are advised to postpone synthetic fertilizer spraying for 24 hours due to high wind gusts (${weatherData.windSpeed} km/h).\n` +
+      `• Ground moisture levels are optimal for standing crops in ${locName}, ${state}.\n` +
+      `• Farmers in ${locName} region are advised to adjust synthetic fertilizer/pesticide spraying for 24 hours based on wind gusts (${weatherData.windSpeed} km/h).\n` +
       `• AI Model Prediction Accuracy: **94.8%** validated against IMD AWS ground telemetry.`;
 
     textHi = `🛰️ **${locName}, ${state} के लिए उपग्रह विश्लेषण**:\n` +

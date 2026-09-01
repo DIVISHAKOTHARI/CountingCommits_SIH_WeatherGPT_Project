@@ -33,7 +33,7 @@ export default function WeatherBackgroundEffects({ weatherData }) {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-      
+
       {/* 1. Rain Drops Animation */}
       {isRainy && (
         <div className="absolute inset-0 w-full h-full">

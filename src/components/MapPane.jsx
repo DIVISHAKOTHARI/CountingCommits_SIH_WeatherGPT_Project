@@ -30,9 +30,10 @@ export default function MapPane({ locationInfo, weatherData }) {
       // Add Zoom control top-right
       L.control.zoom({ position: 'topright' }).addTo(map);
 
-      // Base tile layer (OpenStreetMap / CartoDB)
-      const baseTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
+      // Base tile layer (OpenStreetMap - Reliable No API Key Basemap)
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
 
       mapInstanceRef.current = map;
@@ -46,13 +47,17 @@ export default function MapPane({ locationInfo, weatherData }) {
     };
   }, []);
 
-  // Update center when locationInfo changes
+  // Smoothly animate camera to new resolved latitude/longitude
   useEffect(() => {
-    if (mapInstanceRef.current && locationInfo) {
+    if (mapInstanceRef.current && locationInfo && locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
       mapInstanceRef.current.flyTo(
         [locationInfo.lat, locationInfo.lng],
-        locationInfo.zoom || 7,
-        { duration: 2 }
+        locationInfo.zoom || 10,
+        {
+          duration: 2.2,
+          easeLinearity: 0.25,
+          noMoveStart: true
+        }
       );
     }
   }, [locationInfo]);
@@ -71,31 +76,13 @@ export default function MapPane({ locationInfo, weatherData }) {
 
   // Update Radar Layer on Map
   useEffect(() => {
+    // Disabled radar layer to prevent "Zoom level not supported" and broken tiles
     const map = mapInstanceRef.current;
-    if (!map || !rainViewerData || !showRadar) {
-      if (radarLayerRef.current && map) {
-        map.removeLayer(radarLayerRef.current);
-        radarLayerRef.current = null;
-      }
-      return;
-    }
-
-    const frame = rainViewerData.frames[currentFrameIndex];
-    if (!frame) return;
-
-    if (radarLayerRef.current) {
+    if (radarLayerRef.current && map) {
       map.removeLayer(radarLayerRef.current);
+      radarLayerRef.current = null;
     }
-
-    const tileUrl = `${rainViewerData.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-    const radarLayer = L.tileLayer(tileUrl, {
-      opacity: 0.65,
-      zIndex: 500,
-      tileSize: 256
-    });
-
-    radarLayer.addTo(map);
-    radarLayerRef.current = radarLayer;
+    return;
   }, [rainViewerData, currentFrameIndex, showRadar]);
 
   // Radar Animation Loop
@@ -124,11 +111,17 @@ export default function MapPane({ locationInfo, weatherData }) {
 
     if (style === 'satellite') {
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18,
+        attribution: 'Tiles &copy; Esri'
+      }).addTo(map);
+      // Overlay satellite place & boundary labels
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 18
       }).addTo(map);
     } else {
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
     }
   };

@@ -9,7 +9,7 @@ export default function GlobeIntro({ onEnterPlatform }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // 3D Scene Setup - Globe shifted to the right
+  // 3D Scene Setup - Realistic Earth Globe
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
@@ -28,87 +28,109 @@ export default function GlobeIntro({ onEnterPlatform }) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // Procedural Earth Texture
-    const createEarthTexture = () => {
+    const textureLoader = new THREE.TextureLoader();
+
+    // Base fallback texture canvas in case offline/loading delay
+    const createFallbackCanvas = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = 2048;
-      canvas.height = 1024;
+      canvas.width = 1024;
+      canvas.height = 512;
       const ctx = canvas.getContext('2d');
-
-      const oceanGrad = ctx.createLinearGradient(0, 0, 0, 1024);
-      oceanGrad.addColorStop(0, '#0284c7');
-      oceanGrad.addColorStop(0.5, '#075985');
-      oceanGrad.addColorStop(1, '#0c4a6e');
-      ctx.fillStyle = oceanGrad;
-      ctx.fillRect(0, 0, 2048, 1024);
-
-      // Grid Lines
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < 2048; x += 64) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, 1024);
-        ctx.stroke();
-      }
-      for (let y = 0; y < 1024; y += 64) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(2048, y);
-        ctx.stroke();
-      }
-
-      // Continents
-      ctx.fillStyle = '#10b981';
-      ctx.beginPath();
-      ctx.ellipse(1450, 420, 260, 160, 0, 0, Math.PI * 2); // Asia
-      ctx.fill();
-
-      // Highlight India
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(1468, 396, 25, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Africa & Europe
-      ctx.fillStyle = '#059669';
-      ctx.beginPath();
-      ctx.ellipse(1150, 560, 160, 220, 0.2, 0, Math.PI * 2); // Africa
-      ctx.ellipse(1120, 320, 130, 90, -0.2, 0, Math.PI * 2); // Europe
-      ctx.fill();
-
-      // Americas
-      ctx.beginPath();
-      ctx.ellipse(550, 380, 140, 240, -0.4, 0, Math.PI * 2);
-      ctx.ellipse(720, 680, 120, 180, 0.3, 0, Math.PI * 2);
-      ctx.fill();
-
+      ctx.fillStyle = '#0c4a6e';
+      ctx.fillRect(0, 0, 1024, 512);
       return new THREE.CanvasTexture(canvas);
     };
 
-    const earthTexture = createEarthTexture();
-
-    // Earth Mesh - Shifted +1.3 on X axis (To the right side of the screen)
+    // Earth Mesh
     const globeGeometry = new THREE.SphereGeometry(2.3, 64, 64);
     const globeMaterial = new THREE.MeshPhongMaterial({
-      map: earthTexture,
-      shininess: 25,
-      specular: new THREE.Color(0x38bdf8),
+      map: createFallbackCanvas(),
+      shininess: 15,
+      specular: new THREE.Color(0x224466),
     });
     const globeMesh = new THREE.Mesh(globeGeometry, globeMaterial);
-    
-    // Shift globe right if desktop screen
+
     const isDesktop = window.innerWidth >= 768;
     globeMesh.position.x = isDesktop ? 1.3 : 0;
     scene.add(globeMesh);
 
-    // Atmosphere Glow
-    const atmosphereGeometry = new THREE.SphereGeometry(2.38, 64, 64);
-    const atmosphereMaterial = new THREE.MeshLambertMaterial({
-      color: 0x38bdf8,
+    // Load High-Res Realistic Earth Texture
+    const earthTextureUrl = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
+    const earthBumpUrl = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
+
+    textureLoader.load(
+      earthTextureUrl,
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        globeMaterial.map = texture;
+        globeMaterial.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        // Backup CDN if primary fails
+        textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/planets/earth_atmos_2048.jpg', (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          globeMaterial.map = tex;
+          globeMaterial.needsUpdate = true;
+        });
+      }
+    );
+
+    textureLoader.load(earthBumpUrl, (bumpTex) => {
+      globeMaterial.bumpMap = bumpTex;
+      globeMaterial.bumpScale = 0.04;
+      globeMaterial.needsUpdate = true;
+    });
+
+    // Cloud Layer
+    const cloudGeometry = new THREE.SphereGeometry(2.33, 64, 64);
+    const cloudMaterial = new THREE.MeshPhongMaterial({
       transparent: true,
-      opacity: 0.16,
-      side: THREE.BackSide
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
+    cloudMesh.position.x = globeMesh.position.x;
+    scene.add(cloudMesh);
+
+    // Load Cloud Texture
+    const cloudTextureUrl = 'https://unpkg.com/three-globe/example/img/earth-clouds.png';
+    textureLoader.load(
+      cloudTextureUrl,
+      (cloudTex) => {
+        cloudMaterial.map = cloudTex;
+        cloudMaterial.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/planets/earth_clouds_2048.png', (cTex) => {
+          cloudMaterial.map = cTex;
+          cloudMaterial.needsUpdate = true;
+        });
+      }
+    );
+
+    // Atmosphere Fresnel Glow Shader
+    const atmosphereGeometry = new THREE.SphereGeometry(2.44, 64, 64);
+    const atmosphereMaterial = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.6 - dot(vNormal, vec3(0, 0, 1.0)), 2.2);
+          gl_FragColor = vec4(0.22, 0.65, 0.98, 1.0) * intensity;
+        }
+      `,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      transparent: true
     });
     const atmosphereMesh = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
     atmosphereMesh.position.x = globeMesh.position.x;
@@ -116,35 +138,37 @@ export default function GlobeIntro({ onEnterPlatform }) {
 
     // Stars Particles
     const starGeometry = new THREE.BufferGeometry();
-    const starCount = 1000;
+    const starCount = 1200;
     const starPositions = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount * 3; i += 3) {
-      starPositions[i] = (Math.random() - 0.5) * 100;
-      starPositions[i + 1] = (Math.random() - 0.5) * 100;
-      starPositions[i + 2] = (Math.random() - 0.5) * 100;
+      starPositions[i] = (Math.random() - 0.5) * 120;
+      starPositions[i + 1] = (Math.random() - 0.5) * 120;
+      starPositions[i + 2] = (Math.random() - 0.5) * 120;
     }
     starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starMaterial = new THREE.PointsMaterial({ color: 0x38bdf8, size: 0.15, transparent: true, opacity: 0.8 });
+    const starMaterial = new THREE.PointsMaterial({ color: 0x7dd3fc, size: 0.12, transparent: true, opacity: 0.75 });
     const starField = new THREE.Points(starGeometry, starMaterial);
     scene.add(starField);
 
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+    // Realistic Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0x38bdf8, 2.5);
-    dirLight.position.set(5, 3, 5);
-    scene.add(dirLight);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    sunLight.position.set(5, 3, 5);
+    scene.add(sunLight);
 
     globeMesh.rotation.y = -Math.PI * 0.45;
-    globeMesh.rotation.x = 0.2;
+    globeMesh.rotation.x = 0.15;
+    cloudMesh.rotation.y = -Math.PI * 0.45;
 
     let animationFrameId;
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      globeMesh.rotation.y += 0.003;
-      atmosphereMesh.rotation.y += 0.003;
-      starField.rotation.y -= 0.0005;
+      globeMesh.rotation.y += 0.0012;
+      cloudMesh.rotation.y += 0.0016; // Clouds rotate slightly faster
+      atmosphereMesh.rotation.y += 0.0012;
+      starField.rotation.y -= 0.0003;
       renderer.render(scene, camera);
     };
     animate();
@@ -156,8 +180,10 @@ export default function GlobeIntro({ onEnterPlatform }) {
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
-      globeMesh.position.x = newW >= 768 ? 1.3 : 0;
-      atmosphereMesh.position.x = globeMesh.position.x;
+      const posX = newW >= 768 ? 1.3 : 0;
+      globeMesh.position.x = posX;
+      cloudMesh.position.x = posX;
+      atmosphereMesh.position.x = posX;
     };
     window.addEventListener('resize', handleResize);
 
