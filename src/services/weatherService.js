@@ -1,41 +1,110 @@
 // Service for fetching real-time weather, AQI, and regional forecasts via Open-Meteo API
 
-export const REGION_COORDINATES = {
-  'gujarat': { lat: 22.2587, lng: 71.1924, zoom: 7, name: 'Gujarat', state: 'Gujarat', climate: 'Semi-arid / Coastal' },
-  'ahmedabad': { lat: 23.0225, lng: 72.5714, zoom: 10, name: 'Ahmedabad', state: 'Gujarat', climate: 'Dry Tropical' },
-  'surat': { lat: 21.1702, lng: 72.8311, zoom: 10, name: 'Surat', state: 'Gujarat', climate: 'Coastal Tropical' },
-  'delhi': { lat: 28.6139, lng: 77.2090, zoom: 10, name: 'Delhi NCR', state: 'Delhi', climate: 'Subtropical Steppe' },
-  'mumbai': { lat: 19.0760, lng: 72.8777, zoom: 10, name: 'Mumbai', state: 'Maharashtra', climate: 'Tropical Coastal' },
-  'odisha': { lat: 20.9517, lng: 85.0985, zoom: 7, name: 'Odisha', state: 'Odisha', climate: 'Tropical Monsoon' },
-  'bhubaneswar': { lat: 20.2961, lng: 85.8245, zoom: 10, name: 'Bhubaneswar', state: 'Odisha', climate: 'Tropical Monsoon' },
-  'punjab': { lat: 31.1471, lng: 75.3412, zoom: 8, name: 'Punjab', state: 'Punjab', climate: 'Subtropical Semi-Arid' },
-  'rajasthan': { lat: 27.0238, lng: 74.2179, zoom: 7, name: 'Rajasthan', state: 'Rajasthan', climate: 'Arid / Desert' },
-  'kerala': { lat: 10.8505, lng: 76.2711, zoom: 8, name: 'Kerala', state: 'Kerala', climate: 'Wet Tropical Monsoon' },
-  'tamil nadu': { lat: 11.1271, lng: 78.6569, zoom: 8, name: 'Tamil Nadu', state: 'Tamil Nadu', climate: 'Tropical Maritime' },
-  'chennai': { lat: 13.0827, lng: 80.2707, zoom: 10, name: 'Chennai', state: 'Tamil Nadu', climate: 'Tropical Coastal' },
-  'kolkata': { lat: 22.5726, lng: 88.3639, zoom: 10, name: 'Kolkata', state: 'West Bengal', climate: 'Tropical Wet-Dry' },
-  'assam': { lat: 26.2006, lng: 92.9376, zoom: 8, name: 'Assam', state: 'Assam', climate: 'Humid Subtropical' },
-  'bangalore': { lat: 12.9716, lng: 77.5946, zoom: 10, name: 'Bengaluru', state: 'Karnataka', climate: 'Savanna Tropical' },
-  'india': { lat: 20.5937, lng: 78.9629, zoom: 5, name: 'India (National Overview)', state: 'India', climate: 'Diverse Climatic Zones' },
+// Default fallback location for initial screen load
+export const DEFAULT_LOCATION = {
+  lat: 22.2587,
+  lng: 71.1924,
+  zoom: 7,
+  name: 'Gujarat',
+  state: 'Gujarat',
+  climate: 'Semi-arid / Coastal'
 };
 
-// Detect location from user query string
-export function detectLocationFromQuery(query) {
-  if (!query) return REGION_COORDINATES['gujarat'];
-  const q = query.toLowerCase();
-  
-  for (const [key, info] of Object.entries(REGION_COORDINATES)) {
-    if (q.includes(key)) {
-      return info;
+// 100% Dynamic location extraction and geocoding for ANY place in India or worldwide
+export async function detectLocationFromQuery(query) {
+  if (!query || typeof query !== 'string') return DEFAULT_LOCATION;
+  const q = query.toLowerCase().trim();
+  if (!q) return DEFAULT_LOCATION;
+
+  // Weather and conversational stop words to clean query string
+  const stopWords = new Set([
+    "will", "it", "rain", "raining", "in", "at", "weather", "forecast", "today", "tomorrow",
+    "this", "week", "month", "alert", "alerts", "thunderstorm", "pesticide", "pesticides", "should", "i",
+    "spray", "for", "is", "there", "any", "how", "what", "the", "of", "a", "an",
+    "temperature", "humidity", "wind", "report", "update", "climate", "condition",
+    "conditions", "currently", "now", "live", "show", "me", "tell", "give", "please",
+    "near", "around", "hot", "cold", "sunny", "right", "current", "rainfall", "rainy",
+    "storm", "cloud", "clouds", "cloudy", "degrees", "warning", "advice", "advisory",
+    "help", "can", "you", "check", "get", "info", "information", "details"
+  ]);
+
+  const cleanedText = q.replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+  const tokens = cleanedText.split(' ').filter(word => !stopWords.has(word) && word.length > 1);
+
+  const candidates = [];
+  if (tokens.length > 0) {
+    candidates.push(tokens.join(' '));
+    if (tokens.length > 1) {
+      for (let i = 0; i < tokens.length - 1; i++) {
+        candidates.push(`${tokens[i]} ${tokens[i+1]}`);
+      }
+      for (let i = 0; i < tokens.length; i++) {
+        candidates.push(tokens[i]);
+      }
     }
   }
-  
-  // Default fallback if region not explicitly found
-  if (q.includes('north') || q.includes('himalaya') || q.includes('snow')) return REGION_COORDINATES['delhi'];
-  if (q.includes('cyclone') || q.includes('storm') || q.includes('coast')) return REGION_COORDINATES['odisha'];
-  if (q.includes('crop') || q.includes('farmer') || q.includes('wheat')) return REGION_COORDINATES['punjab'];
-  
-  return REGION_COORDINATES['gujarat'];
+  candidates.push(cleanedText);
+
+  const uniqueCandidates = Array.from(new Set(candidates)).filter(Boolean);
+
+  // 1. Primary Lookup via OpenStreetMap Nominatim (India Prioritized)
+  for (const candidateLocation of uniqueCandidates) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(candidateLocation)}&format=json&addressdetails=1&countrycodes=in&limit=1`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'WeatherGPT-App/1.0' }
+      });
+      const data = await res.json();
+
+      if (data && data.length > 0) {
+        const item = data[0];
+        const resolvedName = item.name || item.address.city || item.address.town || item.address.district || item.address.state || candidateLocation;
+        const resolvedState = item.address.state || item.address.country || 'India';
+        const isState = item.type === 'state' || item.addresstype === 'state' || item.type === 'administrative';
+
+        return {
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon),
+          zoom: isState ? 7 : 10,
+          name: resolvedName.charAt(0).toUpperCase() + resolvedName.slice(1),
+          state: resolvedState,
+          climate: `${resolvedState} Climate`
+        };
+      }
+    } catch (err) {
+      console.warn("Nominatim Geocoding lookup failed:", err);
+    }
+  }
+
+  // 2. Secondary Lookup via Open-Meteo Geocoding API as robust fallback
+  for (const candidateLocation of uniqueCandidates) {
+    try {
+      const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(candidateLocation)}&count=10&language=en&format=json`;
+      const response = await fetch(geoUrl);
+      const data = await response.json();
+
+      if (data && data.results && data.results.length > 0) {
+        const indiaResults = data.results.filter(r => r.country_code === 'IN' || r.country === 'India');
+        const bestResult = indiaResults[0] || data.results[0];
+
+        if (bestResult) {
+          const isRegionOrState = bestResult.feature_code === 'PCLI' || bestResult.feature_code === 'ADM1' || bestResult.feature_code === 'ADM2';
+          return {
+            lat: bestResult.latitude,
+            lng: bestResult.longitude,
+            zoom: isRegionOrState ? 7 : 10,
+            name: bestResult.name,
+            state: bestResult.admin1 || bestResult.country || 'India',
+            climate: `${bestResult.admin1 || 'Regional'} Climate`
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Open-Meteo Geocoding fallback failed:", err);
+    }
+  }
+
+  return DEFAULT_LOCATION;
 }
 
 // Fetch real-time weather and AQI from Open-Meteo
@@ -58,8 +127,8 @@ export async function fetchRealtimeWeather(lat = 22.2587, lng = 71.1924) {
     const daily = weatherRes.daily || {};
     const aqi = aqiRes && aqiRes.current ? aqiRes.current.us_aqi || 42 : Math.floor(35 + Math.random() * 25);
 
-    // Weather condition code to human description mapping
     const weatherDesc = getWeatherDescription(current.weather_code);
+    const isThunderstorm = current.weather_code >= 95 && current.weather_code <= 99;
 
     return {
       temperature: Math.round(current.temperature_2m),
@@ -69,17 +138,19 @@ export async function fetchRealtimeWeather(lat = 22.2587, lng = 71.1924) {
       windDirection: current.wind_direction_10m,
       pressure: Math.round(current.pressure_msl),
       cloudCover: Math.round(current.cloud_cover),
-      precipitation: current.precipitation || 0,
-      rainProb: daily.precipitation_probability_max ? daily.precipitation_probability_max[0] : 15,
+      precipitation: current.precipitation !== undefined ? current.precipitation : 0,
+      rainProb: daily.precipitation_probability_max ? (daily.precipitation_probability_max[0] ?? 0) : 0,
       weatherCode: current.weather_code,
       weatherDesc,
+      isThunderstorm,
+      thunderstormAlert: isThunderstorm ? 'Active Thunderstorm Warning' : 'No Severe Thunderstorm',
       aqi,
       aqiCategory: getAQICategory(aqi),
       dailyForecast: daily.time ? daily.time.slice(0, 7).map((date, idx) => ({
         date: new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
         maxTemp: Math.round(daily.temperature_2m_max[idx]),
         minTemp: Math.round(daily.temperature_2m_min[idx]),
-        precipProb: daily.precipitation_probability_max[idx] || 10,
+        precipProb: daily.precipitation_probability_max[idx] ?? 0,
         weatherCode: daily.weather_code[idx],
         weatherDesc: getWeatherDescription(daily.weather_code[idx])
       })) : [],

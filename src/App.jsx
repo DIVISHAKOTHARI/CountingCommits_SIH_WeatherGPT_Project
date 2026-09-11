@@ -5,7 +5,7 @@ import HomeScreen from './components/HomeScreen';
 import SplitViewLayout from './components/SplitViewLayout';
 import AboutModal from './components/AboutModal';
 import WeatherBackgroundEffects from './components/WeatherBackgroundEffects';
-import { REGION_COORDINATES, detectLocationFromQuery, fetchRealtimeWeather } from './services/weatherService';
+import { DEFAULT_LOCATION, detectLocationFromQuery, fetchRealtimeWeather } from './services/weatherService';
 import { generateWeatherAIResponse } from './services/aiEngine';
 
 export default function App() {
@@ -13,7 +13,7 @@ export default function App() {
   const [currentLang, setCurrentLang] = useState('en');
   const [isAboutOpen, setIsAboutOpen] = useState(false);
 
-  const [currentLocation, setCurrentLocation] = useState(REGION_COORDINATES['gujarat']);
+  const [currentLocation, setCurrentLocation] = useState(DEFAULT_LOCATION);
   const [weatherData, setWeatherData] = useState(null);
   const [messages, setMessages] = useState([]);
 
@@ -30,7 +30,7 @@ export default function App() {
   const handleQuerySubmit = async (queryText) => {
     if (!queryText.trim()) return;
 
-    const targetLoc = detectLocationFromQuery(queryText);
+    const targetLoc = await detectLocationFromQuery(queryText);
     setCurrentLocation(targetLoc);
 
     const freshWeather = await fetchRealtimeWeather(targetLoc.lat, targetLoc.lng);
